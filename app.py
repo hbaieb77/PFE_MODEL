@@ -9,22 +9,41 @@ def get_model():
     model = BertForSequenceClassification.from_pretrained("hbaieb77/nlpmodel")
     return tokenizer,model
 
-
 tokenizer,model = get_model()
+
+
+def predict(text, model, tokenizer, max_len):
+    model.eval()
+    inputs = tokenizer.encode_plus(
+        text,
+        None,
+        add_special_tokens=True,
+        max_length=max_len,
+        pad_to_max_length=True,
+        return_token_type_ids=False,
+        truncation=True
+    )
+    input_ids = torch.tensor(inputs['input_ids'], dtype=torch.long).unsqueeze(0)
+    attention_mask = torch.tensor(inputs['attention_mask'], dtype=torch.long).unsqueeze(0)
+    
+    with torch.no_grad():
+        outputs = model(input_ids, attention_mask=attention_mask)
+    logits = outputs[0]
+    probabilities = torch.nn.functional.softmax(logits, dim=1)
+    predicted_class = torch.argmax(probabilities, dim=1).item()
+    
+    return label_dict[predicted_class]
+
+label_dict = {0: 'Analytics', 1: 'COM BCP BASE CLIENT PARTENAIRE'}
+
+MAX_LEN = 128
+
 
 user_input = st.text_area('Enter Text to Analyze')
 button = st.button("Analyze")
 
-d = {
-    
-  1:'Analytics',
-  0:'COM BCP BASE CLIENT PARTENAIRE'
-}
+
 
 if user_input and button :
-    test_sample = tokenizer([user_input], padding=True, truncation=True, max_length=512,return_tensors='pt')
-    # test_sample
-    output = model(**test_sample)
-    st.write("Logits: ",output.logits)
-    y_pred = np.argmax(output.logits.detach().numpy(),axis=1)
-    st.write("Prediction: ",d[y_pred[0]])
+    predicted_group = predict(user_input, model, tokenizer, MAX_LEN)
+    st.write("Prediction: ",predicted_group)
